@@ -337,10 +337,10 @@ window.saveData = async function() {
         
         // ใช้ set() กับ Merge เพื่ออัปเดตเฉพาะอุปกรณ์นี้
         await assetDocRef.set({
-            [currentDeviceKey]: newAssetData 
+            [currentDevice]: newAssetData 
         }, { merge: true });
 
-        console.log(`Asset registration data saved for ${currentDeviceKey}`);
+        console.log(`Asset registration data saved for ${currentDevice}`);
     }
 
     const baseRec = {
@@ -1281,5 +1281,6 @@ window.onload = function() {
     
 
 };
+
 
 
