@@ -175,14 +175,46 @@ function formatDuration(days) {
 // =========================================================================
 // UI and Form Functions (Global Scope for HTML interaction)
 // =========================================================================
-
+async function loadAssetData(deviceName) {
+    try {
+        const assetDocRef = db.collection('asset_registration').doc(currentSiteKey);
+        const doc = await assetDocRef.get();
+        
+        if (doc.exists) {
+            const allAssets = doc.data();
+            // คืนค่าข้อมูลทะเบียนเฉพาะอุปกรณ์นี้
+            return allAssets[deviceName] || {}; 
+        }
+        return {}; // คืนค่า Object ว่างถ้าไม่พบ Document
+    } catch (error) {
+        console.error("Error loading asset registration data:", error);
+        // หากมี SweetAlert2 ให้ใช้ Swal.fire
+        // Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลทะเบียนอุปกรณ์ได้: ' + error.message, 'error');
+        return {};
+    }
+}
 window.openForm = async function(deviceName) {
-    currentDevice = deviceName; editIndex = -1;
+    currentDevice = deviceName; 
+    editIndex = -1;
+    
     document.getElementById('formTitle').textContent = `บันทึกข้อมูล: ${deviceName}`;
     document.getElementById('overlay').style.display = 'block';
     document.getElementById('formModal').style.display = 'block';
     document.getElementById('editHint').classList.add('hidden');
+    
+    // 1. ล้างฟอร์มทั้งหมดก่อน
     clearForm(); 
+
+    // 2. 💡 NEW: โหลดข้อมูลทะเบียนทรัพย์สิน
+    const assetData = await loadAssetData(deviceName);
+    
+    // 3. ตั้งค่าฟิลด์ Asset Registration
+    // ข้อมูลเหล่านี้ถูกดึงจาก Firestore และตั้งค่าเฉพาะฟิลด์ใหม่เท่านั้น
+    document.getElementById('installDate').value = assetData.installDate || '';
+    document.getElementById('warrantyYears').value = assetData.warrantyYears || 2;
+    document.getElementById('eolYears').value = assetData.eolYears || 10;
+    
+    // 4. โหลดประวัติการชำรุด (โค้ดเดิม)
     await loadHistory();
 }
 
@@ -197,12 +229,16 @@ function clearForm() {
     document.getElementById('brokenDate').value = '';
     document.getElementById('fixedDate').value = '';
     document.getElementById('description').value = '';
+	document.getElementById('installDate').value = '';
+    // ตั้งค่า default กลับไปเป็นค่ามาตรฐาน เช่น 2 และ 10 ปี
+    document.getElementById('warrantyYears').value = 2; 
+    document.getElementById('eolYears').value = 10;
 }
 
 function isValidDate(str) {
     if (!str) return false;
     const d = new Date(str);
-    return d instanceof Date && !isNaN(d);
+    return d instanceof Date && !isNaN(d); 
 }
 
 window.saveData = async function() {
@@ -215,6 +251,9 @@ window.saveData = async function() {
     const brokenDate = document.getElementById('brokenDate').value;
     const fixedDate = document.getElementById('fixedDate').value;
 
+	const installDate = document.getElementById('installDate').value;
+    const warrantyYears = parseInt(document.getElementById('warrantyYears').value) || 0;
+    const eolYears = parseInt(document.getElementById('eolYears').value) || 0;
     // VALIDATION: ห้ามวันที่ชำรุด/ซ่อมแซมอยู่หลังวันที่ปัจจุบัน
     const now = new Date();
     now.setHours(0, 0, 0, 0); 
@@ -286,7 +325,23 @@ window.saveData = async function() {
             }
         }
     }
-    
+    if (installDate) {
+        const newAssetData = {
+            installDate: installDate,
+            warrantyYears: warrantyYears,
+            eolYears: eolYears
+        };
+        
+        // บันทึกไปยัง Collection ใหม่ชื่อ 'asset_registration'
+        const assetDocRef = db.collection('asset_registration').doc(currentSiteKey);
+        
+        // ใช้ set() กับ Merge เพื่ออัปเดตเฉพาะอุปกรณ์นี้
+        await assetDocRef.set({
+            [currentDeviceKey]: newAssetData 
+        }, { merge: true });
+
+        console.log(`Asset registration data saved for ${currentDeviceKey}`);
+    }
 
     const baseRec = {
         user: document.getElementById('userName').value || "ไม่ระบุ",
@@ -785,7 +840,39 @@ function setupRealtimeListener(siteKey) {
         // Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเชื่อมต่อฐานข้อมูลแบบเรียลไทม์ได้: ' + error.message, 'error');
     });
 }
+function calculateAssetStatus(deviceName, assetData) {
+    // ... (ใช้ตรรกะคำนวณเดิมที่เคยแนะนำไป)
+    if (!assetData || !assetData.installDate || !assetData.warrantyYears || !assetData.eolYears) {
+        return { status: 'none', message: 'ไม่มีข้อมูลทะเบียน' };
+    }
 
+    const installDate = new Date(assetData.installDate);
+    const today = new Date();
+    
+    const warrantyEndDate = new Date(installDate);
+    warrantyEndDate.setFullYear(installDate.getFullYear() + assetData.warrantyYears);
+    
+    const eolDate = new Date(installDate);
+    eolDate.setFullYear(installDate.getFullYear() + assetData.eolYears);
+
+    const sixMonthsInMs = 15552000000; // 6 เดือนในหน่วยมิลลิวินาที
+
+    // ตรวจสอบสถานะการแจ้งเตือน
+    if (today > eolDate) {
+        return { status: 'EOL EXPIRED', message: 'สิ้นอายุใช้งานแล้ว' };
+    }
+    if (eolDate.getTime() - today.getTime() < sixMonthsInMs) {
+        return { status: 'EOL WARNING', message: 'ใกล้ถึงวัน EOL' };
+    }
+    if (today > warrantyEndDate) {
+        return { status: 'WARRANTY EXPIRED', message: 'หมดประกันแล้ว' };
+    }
+    if (warrantyEndDate.getTime() - today.getTime() < sixMonthsInMs) {
+        return { status: 'WARRANTY WARNING', message: 'ใกล้หมดประกัน' };
+    }
+    
+    return { status: 'OK', message: 'ปกติ' };
+}
 window.importData = function(event) {
     const file = event.target.files[0];
     if (!file) return;
@@ -801,13 +888,14 @@ window.importData = function(event) {
             const ws = wb.Sheets[wsname];
             const rawData = XLSX.utils.sheet_to_json(ws, { header: 1 });
             if (rawData.length < 2) {
-                // 💡 หากมี SweetAlert2 ให้ใช้ Swal.fire
-                // Swal.fire('ผิดพลาด', 'ไม่พบข้อมูลในไฟล์ Excel', 'error');
+                Swal.fire('ผิดพลาด', 'ไม่พบข้อมูลในไฟล์ Excel', 'error');
                 return;
             }
 
             const headers = rawData[0];
             const recordsToSave = {};
+            // 💡 NEW: Object สำหรับเก็บข้อมูลทะเบียนทรัพย์สิน
+            const assetsToSave = {}; 
 
             const headerMap = {
                 'ชื่ออุปกรณ์': -1, 
@@ -815,7 +903,11 @@ window.importData = function(event) {
                 'วันที่ซ่อมแซม': -1, 
                 'สถานะ': -1, 
                 'คำอธิบาย': -1, 
-                'ผู้บันทึก': -1
+                'ผู้บันทึก': -1,
+                // 💡 NEW Asset Registration Headers
+                'วันที่ติดตั้ง': -1,
+                'ระยะเวลารับประกัน (ปี)': -1,
+                'อายุการใช้งานที่คาดการณ์ (ปี)': -1
             };
             
             headers.forEach((h, i) => {
@@ -825,99 +917,149 @@ window.importData = function(event) {
                 }
             });
 
-            const requiredHeaders = ['ชื่ออุปกรณ์', 'วันที่ชำรุด', 'สถานะ'];
-            if (requiredHeaders.some(h => headerMap[h] === -1)) {
-                // 💡 หากมี SweetAlert2 ให้ใช้ Swal.fire
-                // Swal.fire('ผิดพลาด', 'ไฟล์นำเข้าต้องมีคอลัมน์: ชื่ออุปกรณ์, วันที่ชำรุด, สถานะ', 'error');
+            const requiredHistoryHeaders = ['ชื่ออุปกรณ์', 'วันที่ชำรุด', 'สถานะ'];
+            if (requiredHistoryHeaders.some(h => headerMap[h] === -1)) {
+                // เปลี่ยนข้อความแจ้งเตือนให้เฉพาะเจาะจงขึ้น
+                Swal.fire('ผิดพลาด', 'ไฟล์นำเข้าต้องมีคอลัมน์หลักสำหรับประวัติชำรุด: ชื่ออุปกรณ์, วันที่ชำรุด, สถานะ', 'error');
                 return;
             }
 
-           for (let i = 1; i < rawData.length; i++) {
-                const row = rawData[i];
-                
-                const deviceName = row[headerMap['ชื่ออุปกรณ์']];
-                if (!deviceName) continue;
-
-               const statusValue = (row[headerMap['สถานะ']] || '').toString();
-                const importedBrokenDate = (row[headerMap['วันที่ชำรุด']] || '').toString().slice(0, 10);
-                const importedFixedDate = (row[headerMap['วันที่ซ่อมแซม']] || '').toString().slice(0, 10);
+            for (let i = 1; i < rawData.length; i++) {
+                const row = rawData[i];
                 
-                // ✅ FIX 1: ตรวจสอบและทำให้เป็น null
-                // ถ้า importedFixedDate ไม่ว่าง ให้ใช้ค่า ถ้าว่าง ให้เป็น null
+                const deviceName = row[headerMap['ชื่ออุปกรณ์']];
+                if (!deviceName) continue;
+
+                // ====================================================================
+                // 💡 NEW: 1. ประมวลผลข้อมูลทะเบียนทรัพย์สิน (Asset Registration)
+                // ====================================================================
+                const importedInstallDate = (row[headerMap['วันที่ติดตั้ง']] || '').toString().slice(0, 10);
+                // ใช้ Number.parseInt เพื่อจัดการค่าที่อาจเป็นตัวเลข
+                const importedWarranty = Number.parseInt(row[headerMap['ระยะเวลารับประกัน (ปี)']] || 0);
+                const importedEol = Number.parseInt(row[headerMap['อายุการใช้งานที่คาดการณ์ (ปี)']] || 0);
+
+                // บันทึก Asset Data: ใช้ข้อมูลจากแถวแรกที่พบสำหรับอุปกรณ์นั้น
+                if (importedInstallDate.length > 0 && !assetsToSave[deviceName]) {
+                     assetsToSave[deviceName] = {
+                         installDate: importedInstallDate,
+                         warrantyYears: importedWarranty,
+                         eolYears: importedEol
+                     };
+                }
+                // ====================================================================
+
+                // โค้ดเดิม: 2. ประมวลผลข้อมูลประวัติการชำรุด (Breakdown History)
+                const statusValue = (row[headerMap['สถานะ']] || '').toString();
+                const importedBrokenDate = (row[headerMap['วันที่ชำรุด']] || '').toString().slice(0, 10);
+                const importedFixedDate = (row[headerMap['วันที่ซ่อมแซม']] || '').toString().slice(0, 10);
+                
                 const fixedDateValue = importedFixedDate.length > 0 ? importedFixedDate : null;
 
-                const record = {
-                    ts: Date.now() + i, 
-                    brokenDate: importedBrokenDate,
-                    fixedDate: fixedDateValue, // 👈 ใช้ fixedDateValue
-                    status: statusValue.includes('ชำรุด') ? 'down' : 'ok',
-                    description: (row[headerMap['คำอธิบาย']] || '').toString() || 'นำเข้าจาก Excel',
-                    user: (row[headerMap['ผู้บันทึก']] || '').toString() || 'ImportTool', 
-                    counted: !!importedBrokenDate, 
-                };
+                const record = {
+                    ts: Date.now() + i, 
+                    brokenDate: importedBrokenDate,
+                    fixedDate: fixedDateValue, 
+                    status: statusValue.includes('ชำรุด') ? 'down' : 'ok',
+                    description: (row[headerMap['คำอธิบาย']] || '').toString() || 'นำเข้าจาก Excel',
+                    user: (row[headerMap['ผู้บันทึก']] || '').toString() || 'ImportTool', 
+                    counted: !!importedBrokenDate, 
+                };
 
-                // 💡 บังคับสถานะเป็น 'down' หากยังไม่ซ่อม (FixedDate เป็น null)
+                // 💡 บังคับสถานะเป็น 'down' หากยังไม่ซ่อม
                 if (record.brokenDate && record.fixedDate === null) {
                     record.status = 'down';
                 }
 
-                if (!recordsToSave[deviceName])
-	             {recordsToSave[deviceName] = [];}
+                if (!recordsToSave[deviceName])
+	              {recordsToSave[deviceName] = [];}
                 recordsToSave[deviceName].push(record);
             }
             
-            const batch = db.batch();
+            
+            // ====================================================================
+            // 💡 NEW BATCH 1: บันทึกข้อมูลทะเบียนทรัพย์สิน (Asset Registration)
+            // ====================================================================
+            const assetBatch = db.batch();
+            let totalAssetsUpdated = 0;
+            const assetRegDocRef = db.collection('asset_registration').doc(currentSiteKey);
+
+            Object.keys(assetsToSave).forEach(deviceName => {
+                const assetData = assetsToSave[deviceName];
+                if (assetData && assetData.installDate.length > 0) {
+                     assetBatch.set(
+                         assetRegDocRef,
+                         { [deviceName]: assetData }, 
+                         { merge: true }
+                     );
+                     totalAssetsUpdated++;
+                }
+            });
+            
+            // Commit Asset Batch (ดำเนินการแบบ Asynchronous)
+            if (totalAssetsUpdated > 0) {
+                 assetBatch.commit().then(() => {
+                     console.log(`Successfully updated asset registration for ${totalAssetsUpdated} devices.`);
+                 }).catch(error => {
+                     console.error("Error writing asset batch: ", error);
+                     Swal.fire('ผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกข้อมูลทะเบียนทรัพย์สิน: ' + error.message, 'error');
+                 });
+            }
+            // ====================================================================
+
+
+            // โค้ดเดิม: BATCH 2: บันทึกข้อมูลประวัติการชำรุด (Breakdown History)
+            const historyBatch = db.batch();
             let totalRecords = 0;
 
             Object.keys(recordsToSave).forEach(deviceName => {
+                // 💡 สมมติว่า getSiteCollection(currentSiteKey) คือ Reference ไปยัง collection devices
                 const deviceRef = getSiteCollection(currentSiteKey).doc(deviceName);
                 const newRecords = recordsToSave[deviceName];
                 totalRecords += newRecords.length;
 
-                // ใช้ arrayUnion เพื่อเพิ่มรายการบันทึกใหม่เข้าไปใน array เดิม
-                batch.set(
+                historyBatch.set(
                     deviceRef,
-                    {
-                        records: firebase.firestore.FieldValue.arrayUnion(...newRecords)
-                    },
+                    { records: firebase.firestore.FieldValue.arrayUnion(...newRecords) },
                     { merge: true }
                 );
             });
 
-           if (totalRecords > 0) {
-                batch.commit().then(() => {
-                    
-                    window.updateAllAffectedDevicesSummary(Object.keys(recordsToSave)); 
+            if (totalRecords > 0) {
+                historyBatch.commit().then(() => {
                     
-                    // ✅ FIX: เพิ่มแจ้งเตือนนำเข้าสำเร็จ
-                    Swal.fire({
-                        title: 'นำเข้าสำเร็จ!',
-                        text: `นำเข้ารายการบันทึกทั้งหมด ${totalRecords} รายการ เสร็จสมบูรณ์`,
-                        icon: 'success',
-                        confirmButtonText: 'ตกลง'
-                    });
+                    window.updateAllAffectedDevicesSummary(Object.keys(recordsToSave)); 
+                    
+                    Swal.fire({
+                        title: 'นำเข้าสำเร็จ!',
+                        text: `นำเข้ารายการบันทึกทั้งหมด ${totalRecords} รายการ และอัปเดตทะเบียนทรัพย์สิน ${totalAssetsUpdated} รายการ`,
+                        icon: 'success',
+                        confirmButtonText: 'ตกลง'
+                    });
 
-                }).catch(error => {
-                    console.error("Error writing batch: ", error);
-                    // 💡 เปิดใช้งาน Swal.fire สำหรับข้อผิดพลาด
-                    Swal.fire('ผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + error.message, 'error');
-                });
-            } else {
-                // 💡 เปิดใช้งาน Swal.fire สำหรับกรณีไม่มีรายการนำเข้า
-                Swal.fire('ผิดพลาด', 'ไม่พบรายการบันทึกที่ถูกต้องสำหรับการนำเข้า', 'error');
-            }
+                }).catch(error => {
+                    console.error("Error writing batch: ", error);
+                    Swal.fire('ผิดพลาด', 'เกิดข้อผิดพลาดในการบันทึกประวัติชำรุด: ' + error.message, 'error');
+                });
+            } else if (totalAssetsUpdated > 0) {
+                 // กรณีที่อัปเดต Asset Data สำเร็จ แต่ไม่มี History Record
+                 Swal.fire({
+                        title: 'นำเข้าสำเร็จ!',
+                        text: `อัปเดตทะเบียนทรัพย์สิน ${totalAssetsUpdated} รายการ (ไม่มีประวัติการชำรุดใหม่)`,
+                        icon: 'success',
+                        confirmButtonText: 'ตกลง'
+                    });
+            } else {
+                Swal.fire('ผิดพลาด', 'ไม่พบรายการบันทึกหรือข้อมูลทะเบียนที่ถูกต้องสำหรับการนำเข้า', 'error');
+            }
 
 
         } catch (error) {
             console.error("Import Error: ", error);
-             // 💡 หากมี SweetAlert2 ให้ใช้ Swal.fire
-            // Swal.fire('ผิดพลาด', 'เกิดข้อผิดพลาดในการอ่านไฟล์: ' + error.message, 'error');
+            Swal.fire('ผิดพลาด', 'เกิดข้อผิดพลาดในการอ่านไฟล์: ' + error.message, 'error');
         }
     };
     reader.readAsArrayBuffer(file);
 };
-
-
 window.exportAllDataExcel = async function() {
     const siteData = sites[currentSiteKey];
     if (!siteData || siteData.devices.length === 0) {
@@ -926,28 +1068,69 @@ window.exportAllDataExcel = async function() {
         return;
     }
     
+    // ====================================================================
+    // 💡 NEW: ดึงข้อมูลทะเบียนทรัพย์สินทั้งหมด
+    // ====================================================================
+    const assetRegDocRef = db.collection('asset_registration').doc(currentSiteKey);
+    const assetRegDoc = await assetRegDocRef.get();
+    const allAssetData = assetRegDoc.exists ? assetRegDoc.data() : {};
+    // ====================================================================
+
+    // โค้ดเดิม: ดึงข้อมูลประวัติการชำรุดทั้งหมด
     const docsSnap = await getAllDevicesDocs(currentSiteKey);
     const dataMap = {};
     docsSnap.forEach(d => dataMap[d.id] = d.data());
 
-    // Header
+    // Header (เพิ่มคอลัมน์ใหม่)
     const header = [
-        'ชื่ออุปกรณ์', 
-        'วันที่ชำรุด', 
-        'วันที่ซ่อมแซม', 
-        'ระยะเวลาชำรุด', 
-        'สถานะ', 
-        'คำอธิบาย', 
-        'ผู้บันทึก' 
+        'ชื่ออุปกรณ์',
+        'วันที่ติดตั้ง', // 💡 NEW
+        'ระยะเวลารับประกัน (ปี)', // 💡 NEW
+        'อายุการใช้งานที่คาดการณ์ (ปี)', // 💡 NEW
+        'สถานะการแจ้งเตือนทรัพย์สิน', // 💡 NEW
+        'วันที่ชำรุด',
+        'วันที่ซ่อมแซม',
+        'ระยะเวลาชำรุด',
+        'สถานะ',
+        'คำอธิบาย',
+        'ผู้บันทึก'
     ];
     const data = [];
 
     for (const devName of siteData.devices) {
         const docData = dataMap[devName];
-        if (!docData) continue; 
         
-        const records = docData.records || [];
+        // 💡 NEW: ดึงข้อมูลทะเบียนทรัพย์สินสำหรับอุปกรณ์นี้และคำนวณสถานะ
+        const assetData = allAssetData[devName] || {};
+        const assetStatus = calculateAssetStatus(devName, assetData);
+
+        // จัดเตรียมข้อมูลทะเบียนทรัพย์สิน
+        const installDate = assetData.installDate || '-';
+        const warrantyYears = assetData.warrantyYears || '-';
+        const eolYears = assetData.eolYears || '-';
+        const statusMessage = assetStatus.message;
         
+        const records = docData?.records || [];
+        
+        if (records.length === 0) {
+            // กรณีที่มีข้อมูลทะเบียน แต่ไม่มีประวัติชำรุด (สำคัญ: ต้องส่งออกรายการนี้ด้วย)
+            data.push([
+                devName,
+                installDate,
+                warrantyYears,
+                eolYears,
+                statusMessage,
+                '-', // brokenDate
+                '-', // fixedDate
+                '-', // duration
+                '-', // status
+                '-', // description
+                '-', // user
+            ]);
+            continue;
+        }
+
+        // Loop ผ่านประวัติการชำรุด
         records.forEach(r => {
             
             let duration = '-';
@@ -957,27 +1140,32 @@ window.exportAllDataExcel = async function() {
                     const days = calculateDaysDifference(r.brokenDate, r.fixedDate);
                     duration = formatDuration(days);
                 } else if (r.status === 'down') {
-                    const days = calculateDaysDifference(r.brokenDate, null); 
+                    const days = calculateDaysDifference(r.brokenDate, null);
                     duration = formatDuration(days) + ' (ชำรุด)';
                 }
             }
             
+            // 💡 NEW: เพิ่มข้อมูลทะเบียนทรัพย์สินและสถานะเข้าไปในแถวข้อมูล
             data.push([
                 devName,
+                installDate, // 💡 NEW
+                warrantyYears, // 💡 NEW
+                eolYears, // 💡 NEW
+                statusMessage, // 💡 NEW
                 r.brokenDate || '-',
                 r.fixedDate || '-',
-                duration, 
+                duration,
                 r.status === 'down' ? 'ชำรุด' : 'ใช้งานได้',
                 r.description || '-',
-                r.user || '-', 
+                r.user || '-',
             ]);
         });
     }
 
     if (data.length === 0) {
-         // 💡 หากมี SweetAlert2 ให้ใช้ Swal.fire
-         // Swal.fire('แจ้งเตือน', 'ไม่พบรายการบันทึกการชำรุดในไซต์งานปัจจุบันสำหรับการส่งออก', 'warning');
-         return;
+        // 💡 หากมี SweetAlert2 ให้ใช้ Swal.fire
+        // Swal.fire('แจ้งเตือน', 'ไม่พบรายการบันทึกการชำรุดในไซต์งานปัจจุบันสำหรับการส่งออก', 'warning');
+        return;
     }
 
     // Assume XLSX library is loaded
@@ -1094,3 +1282,4 @@ window.onload = function() {
     
 
 };
+
