@@ -211,8 +211,8 @@ window.openForm = async function(deviceName) {
     // 3. ตั้งค่าฟิลด์ Asset Registration
     // ข้อมูลเหล่านี้ถูกดึงจาก Firestore และตั้งค่าเฉพาะฟิลด์ใหม่เท่านั้น
     document.getElementById('installDate').value = assetData.installDate || '';
-    document.getElementById('warrantyYears').value = assetData.warrantyYears || 2;
-    document.getElementById('eolYears').value = assetData.eolYears || 10;
+    document.getElementById('warrantyYears').value = assetData.warrantyYears || '';
+    document.getElementById('eolYears').value = assetData.eolYears || '';
     
     // 4. โหลดประวัติการชำรุด (โค้ดเดิม)
     await loadHistory();
@@ -230,9 +230,8 @@ function clearForm() {
     document.getElementById('fixedDate').value = '';
     document.getElementById('description').value = '';
 	document.getElementById('installDate').value = '';
-    // ตั้งค่า default กลับไปเป็นค่ามาตรฐาน เช่น 2 และ 10 ปี
-    document.getElementById('warrantyYears').value = 2; 
-    document.getElementById('eolYears').value = 10;
+    document.getElementById('warrantyYears').value = ''; 
+    document.getElementById('eolYears').value = '';
 }
 
 function isValidDate(str) {
@@ -402,8 +401,6 @@ window.clearCurrentDevice = async function() {
         // 💡 หากมี SweetAlert2 ให้ใช้ Swal.fire("ลบเรียบร้อย", "", "success");
     } 
 } 
-
-// File: main.js - แทนที่ฟังก์ชัน loadHistory ทั้งหมด
 async function loadHistory() {
     const container = document.getElementById('historySection');
     container.innerHTML = '';
@@ -523,10 +520,6 @@ window.editRecord = async function(ts) {
     editIndex = idx;
     document.getElementById('editHint').classList.remove('hidden');
 };
-
-// =========================================================================
-// Summary Table and Filtering Logic
-// =========================================================================
 
 window.updateDeviceSummary = async function() {
     const siteData = sites[currentSiteKey];
@@ -740,10 +733,6 @@ window.changePage = function(step) {
     if (currentPage < 1) currentPage = 1;
     window.updateDeviceSummary(); 
 }
-
-// =========================================================================
-// Topology Map and Overlays
-// =========================================================================
 
 window.updateDeviceStatusOverlays = async function(siteKey) {
     const mapContainer = document.getElementById(`map-${siteKey}`);
@@ -1067,9 +1056,6 @@ window.exportAllDataExcel = async function() {
         return;
     }
     
-    // ====================================================================
-    // 💡 NEW: ดึงข้อมูลทะเบียนทรัพย์สินทั้งหมด
-    // ====================================================================
     const assetRegDocRef = db.collection('asset_registration').doc(currentSiteKey);
     const assetRegDoc = await assetRegDocRef.get();
     const allAssetData = assetRegDoc.exists ? assetRegDoc.data() : {};
@@ -1079,8 +1065,6 @@ window.exportAllDataExcel = async function() {
     const docsSnap = await getAllDevicesDocs(currentSiteKey);
     const dataMap = {};
     docsSnap.forEach(d => dataMap[d.id] = d.data());
-
-    // Header (เพิ่มคอลัมน์ใหม่)
     const header = [
         'ชื่ออุปกรณ์',
         'วันที่ติดตั้ง', // 💡 NEW
@@ -1172,7 +1156,7 @@ window.exportAllDataExcel = async function() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "DeviceRecords");
 
-    const fileName = `Device_Records_Export_${siteData.name.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const fileName = `Device_Records_microgridPEA_${siteData.name.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, fileName);
 
     alert('ส่งออกข้อมูลเรียบร้อยแล้ว');
@@ -1237,10 +1221,6 @@ function switchSite(siteKey) {
     window.updateDeviceStatusOverlays(currentSiteKey); 
 }
 
-// =========================================================================
-// Initialization
-// =========================================================================
-
 document.addEventListener("DOMContentLoaded", function() {
     const locationSelect = document.getElementById("location-select");
     
@@ -1278,9 +1258,8 @@ document.addEventListener("DOMContentLoaded", function() {
 
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
-    
-
 };
+
 
 
 
