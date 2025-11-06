@@ -192,12 +192,9 @@ async function loadAssetData(deviceName) {
         return {}; // คืนค่า Object ว่างถ้าไม่พบ Document
     } catch (error) {
         console.error("Error loading asset registration data:", error);
-        // หากมี SweetAlert2 ให้ใช้ Swal.fire
-        // Swal.fire('ข้อผิดพลาด', 'ไม่สามารถโหลดข้อมูลทะเบียนอุปกรณ์ได้: ' + error.message, 'error');
         return {};
     }
 }
-// ใน main (3).js (ค้นหาและแทนที่ฟังก์ชันนี้ทั้งหมด)
 
 window.openForm = async function(deviceName) {
     currentDevice = deviceName; 
@@ -214,19 +211,20 @@ window.openForm = async function(deviceName) {
     // 2. โหลดข้อมูลทะเบียนทรัพย์สิน
     const assetData = await loadAssetData(deviceName);
     
-    // 3. ตั้งค่าฟิลด์ Asset Registration (รวมฟิลด์ใหม่ที่เพิ่มเข้าไป)
-    document.getElementById('assetId')?.value = assetData.assetId || ''; // NEW
-    document.getElementById('manufacturer')?.value = assetData.manufacturer || ''; // NEW
-    document.getElementById('model')?.value = assetData.model || ''; // NEW
-    document.getElementById('warrantyStartDate')?.value = assetData.warrantyStartDate || ''; // NEW
+    // 3. ตั้งค่าฟิลด์ Asset Registration (แก้ไข: นำ ?. ออกจากการกำหนดค่า)
+    document.getElementById('assetId').value = assetData.assetId || ''; 
+    document.getElementById('manufacturer').value = assetData.manufacturer || ''; 
+    document.getElementById('model').value = assetData.model || ''; 
+    document.getElementById('warrantyStartDate').value = assetData.warrantyStartDate || '';
 
-    document.getElementById('installDate')?.value = assetData.installDate || '';
+    document.getElementById('installDate').value = assetData.installDate || '';
     // ตั้งค่า warrantyYears ให้เป็น 0 หากไม่มีข้อมูล เพื่อแก้ Warning
-    document.getElementById('warrantyYears')?.value = assetData.warrantyYears !== undefined ? assetData.warrantyYears : 0;
+    document.getElementById('warrantyYears').value = assetData.warrantyYears !== undefined ? assetData.warrantyYears : 0;
         
     // 4. โหลดประวัติการชำรุด
     await loadHistory();
 }
+
 window.closeForm = function() {
     document.getElementById('overlay').style.display = 'none';
     document.getElementById('formModal').style.display = 'none';
@@ -240,15 +238,13 @@ function clearForm() {
     document.getElementById('fixedDate').value = '';
     document.getElementById('description').value = '';
 
-    // Asset Fields (ใช้ ?.value เพื่อความปลอดภัย ถ้า ID ยังไม่มีใน HTML)
-    document.getElementById('assetId')?.value = ''; 
-    document.getElementById('manufacturer')?.value = '';
-    document.getElementById('model')?.value = '';
-	document.getElementById('installDate')?.value = '';
-    document.getElementById('warrantyStartDate')?.value = '';
-    document.getElementById('warrantyYears')?.value = '0'; // ตั้งค่าเป็น 0 เพื่อแก้ Warning
-
-    // ❌ ลบ document.getElementById('eolYears').value = ''; ออก
+    // Asset Fields (แก้ไข: นำ ?. ออกจากการกำหนดค่า)
+    document.getElementById('assetId').value = ''; 
+    document.getElementById('manufacturer').value = '';
+    document.getElementById('model').value = '';
+	document.getElementById('installDate').value = '';
+    document.getElementById('warrantyStartDate').value = '';
+    document.getElementById('warrantyYears').value = '0'; // ตั้งค่าเป็น 0 เพื่อแก้ Warning
 }
 
 function isValidDate(str) {
@@ -271,6 +267,7 @@ window.saveData = async function() {
     const description = document.getElementById('description').value.trim();
 
     // --- 2. Asset Registration Data ---
+    // ใช้ ?. ในการอ่านค่า (reading) สามารถทำได้
     const assetId = document.getElementById('assetId')?.value || '';
     const manufacturer = document.getElementById('manufacturer')?.value || '';
     const model = document.getElementById('model')?.value || '';
@@ -357,7 +354,6 @@ window.saveData = async function() {
         installDate: installDate,
         warrantyStartDate: warrantyStartDate,
         warrantyYears: warrantyYears,
-        // ไม่มี eolYears แล้ว
     };
 
     try {
@@ -1294,6 +1290,7 @@ document.addEventListener("DOMContentLoaded", function() {
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
 };
+
 
 
 
