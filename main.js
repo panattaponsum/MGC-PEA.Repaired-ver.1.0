@@ -550,7 +550,7 @@ window.exportAllDataExcel = async function() {
     Swal.fire('ส่งออกข้อมูลสำเร็จ', `ไฟล์ ${filename} ถูกดาวน์โหลดแล้ว`, 'success');
 };
 
-window.importSiteDataFromExcel = function() {
+window.importData = function() {
     if (typeof XLSX === 'undefined') {
         Swal.fire('ข้อผิดพลาด', 'ไม่พบไลบรารี SheetJS (XLSX) กรุณาตรวจสอบการนำเข้าไฟล์ script', 'error');
         return;
@@ -1305,6 +1305,7 @@ document.addEventListener("DOMContentLoaded", function() {
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
 };
+
 
 
 
