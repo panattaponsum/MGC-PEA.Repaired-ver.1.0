@@ -146,15 +146,14 @@ window.handleAuthAction = function() {
 
 // 💡 NEW: เพิ่มโค้ดสำหรับจัดการผลลัพธ์จากการ Redirect
 auth.getRedirectResult().then((result) => {
-    // โค้ดส่วนนี้จะทำงานเมื่อผู้ใช้ถูก Redirect กลับมาจากหน้าล็อคอินของ Google
     if (result.credential) {
-        // หากล็อคอินสำเร็จ
-        // const token = result.credential.accessToken; // หากต้องการใช้ Access Token
-        // const user = result.user; // ผู้ใช้จะถูกจัดการโดย onAuthStateChanged อยู่แล้ว
+        // หากล็อคอินสำเร็จ result.user จะถูกจัดการโดย onAuthStateChanged ต่อไป
+        console.log("Login successful via redirect.");
     }
 }).catch((error) => {
     // จัดการข้อผิดพลาดหลังการ Redirect
     console.error("Login failed after redirect:", error);
+    // ไม่ต้องทำอะไรมาก เพราะ onAuthStateChanged จะจัดการ UI ให้อยู่แล้ว
     if (error.code !== 'auth/unauthorized-domain') {
         Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการล็อคอิน: ' + error.message, 'error');
     }
@@ -1446,6 +1445,7 @@ document.addEventListener("DOMContentLoaded", function() {
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
 };
+
 
 
 
