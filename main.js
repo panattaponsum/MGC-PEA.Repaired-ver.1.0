@@ -225,7 +225,14 @@ function updateUIForAuthState(user) {
 window.handleAuthAction = function() {
     if (!auth.currentUser) {
         const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithRedirect(provider);
+       auth.signInWithPopup(provider) // 🟢 เปลี่ยนเป็น Pop-up
+        .then(() => {
+            // ไม่ต้องทำอะไร ปล่อยให้ onAuthStateChanged ทำงานต่อ
+        })
+        .catch((error) => {
+            console.error("Popup login failed:", error);
+            Swal.fire('ข้อผิดพลาดการล็อคอิน', 'กรุณาลองอีกครั้ง: ' + error.message, 'error');
+        });
               
     } else {
         // โค้ดสำหรับ Logout
@@ -1513,6 +1520,7 @@ document.addEventListener("DOMContentLoaded", function() {
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
 };
+
 
 
 
