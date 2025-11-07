@@ -51,15 +51,18 @@ const sites = {
 let currentSiteKey = "ko-phaluay";
 let currentDevice = null, editIndex = -1, chartInstance = null;
 let currentPage = 1;
-const pageSize = 7; // 💡 Note: This is overridden by 10 in updateDeviceSummary, kept for consistency
+const pageSize = 7; 
 
-// 💥 START: NEW AUTHENTICATION STATE MANAGEMENT 💥
+
 let isAuthenticated = false;
 let currentUser = null; // Store user object
 
 function updateUIForAuthState(user) {
     const authButton = document.getElementById('authButton');
-    const userNameDisplay = document.getElementById('userNameDisplay');
+    
+    // 💥 FIX: ตรวจสอบการอ้างอิง ID ให้ถูกต้อง (userNameDisplay) 💥
+    const userNameDisplay = document.getElementById('userNameDisplay'); 
+    
     // ปุ่มฟังก์ชัน
     const summaryButton = document.getElementById('summaryButton');
     const exportButton = document.getElementById('exportButton');
@@ -75,8 +78,11 @@ function updateUIForAuthState(user) {
         authButton.classList.remove('btn-brand');
         authButton.classList.add('btn-ghost');
         
-        Display.textContent = `ยินดีต้อนรับ: ${email}`;
-        Display.classList.remove('hidden');
+        // 💥 FIX: ใช้ userNameDisplay ที่ถูกต้องและมีการตรวจสอบ 💥
+        if (userNameDisplay) {
+             userNameDisplay.textContent = `ยินดีต้อนรับ: ${email}`;
+             userNameDisplay.classList.remove('hidden');
+        }
 
         // แสดงปุ่มฟังก์ชันทั้งหมดเมื่อล็อคอินแล้ว
         summaryButton.classList.remove('hidden');
@@ -97,7 +103,10 @@ function updateUIForAuthState(user) {
         authButton.classList.add('btn-brand');
         authButton.classList.remove('btn-ghost');
         
-        Display.classList.add('hidden');
+        // 💥 FIX: ใช้ userNameDisplay ที่ถูกต้องและมีการตรวจสอบ 💥
+        if (userNameDisplay) {
+            userNameDisplay.classList.add('hidden');
+        }
 
         // ซ่อนปุ่มฟังก์ชันทั้งหมดเมื่อยังไม่ล็อคอิน
         summaryButton.classList.add('hidden');
@@ -118,8 +127,6 @@ function updateUIForAuthState(user) {
         window.updateDeviceSummary();
     }
 }
-
-// Global function to handle login/logout action
 window.handleAuthAction = function() {
     if (isAuthenticated) {
         auth.signOut();
@@ -1398,6 +1405,7 @@ document.addEventListener("DOMContentLoaded", function() {
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
 };
+
 
 
 
