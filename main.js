@@ -129,16 +129,37 @@ function updateUIForAuthState(user) {
 }
 window.handleAuthAction = function() {
     if (isAuthenticated) {
+        // กรณี Logout ยังคงใช้ signOut() เหมือนเดิม
         auth.signOut();
     } else {
+        // 💥 FIX: เปลี่ยนจาก signInWithPopup() เป็น signInWithRedirect() 💥
+        
         // ใช้ Google Sign-In
         const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithPopup(provider).catch(error => {
-            console.error("Login failed:", error);
-            Swal.fire('ข้อผิดพลาด', 'ไม่สามารถเข้าสู่ระบบด้วย Google ได้: ' + error.message, 'error');
-        });
+        // กำหนดให้ขอ Email, Profile
+        provider.addScope('profile');
+        provider.addScope('email');
+
+        auth.signInWithRedirect(provider); // <--- แก้ไขตรงนี้
     }
 };
+
+// 💡 NEW: เพิ่มโค้ดสำหรับจัดการผลลัพธ์จากการ Redirect
+auth.getRedirectResult().then((result) => {
+    // โค้ดส่วนนี้จะทำงานเมื่อผู้ใช้ถูก Redirect กลับมาจากหน้าล็อคอินของ Google
+    if (result.credential) {
+        // หากล็อคอินสำเร็จ
+        // const token = result.credential.accessToken; // หากต้องการใช้ Access Token
+        // const user = result.user; // ผู้ใช้จะถูกจัดการโดย onAuthStateChanged อยู่แล้ว
+    }
+}).catch((error) => {
+    // จัดการข้อผิดพลาดหลังการ Redirect
+    console.error("Login failed after redirect:", error);
+    if (error.code !== 'auth/unauthorized-domain') {
+        Swal.fire('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการล็อคอิน: ' + error.message, 'error');
+    }
+});
+auth.onAuthStateChanged(updateUIForAuthState);
 
 // ฟังก์ชันบังคับตรวจสอบสิทธิ์
 function requireAuth() {
@@ -1405,6 +1426,7 @@ document.addEventListener("DOMContentLoaded", function() {
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
 };
+
 
 
 
