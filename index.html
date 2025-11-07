@@ -337,10 +337,14 @@ h1,h2,h3,th {
   </div>
 </div>
 </main>
-<div id="overlay"></div>
-
+	
+<div id="overlay" onclick="closeForm()"></div>
 <div id="formModal">
-  <h2 id="formTitle" class="text-xl font-bold mb-3">บันทึกข้อมูล</h2>
+<div class="row mb-2">
+<h3 id="formTitle" class="m-0">บันทึกข้อมูล</h3>
+<span class="spacer"></span>
+<button class="btn btn-ghost" onclick="closeForm()">✖ ปิด</button>
+</div>
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
     <div>
       <label>ผู้บันทึก (ล็อคอิน)</label>
@@ -417,6 +421,7 @@ h1,h2,h3,th {
 </body>
 
 </html>
+
 
 
 
