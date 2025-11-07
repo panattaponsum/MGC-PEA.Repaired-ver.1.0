@@ -200,24 +200,22 @@ function updateUIForAuthState(user) {
         }
     }
 }
+
 window.handleAuthAction = function() {
-    if (!auth.currentUser) {
-        // สร้าง Provider (ถ้ายังไม่ได้ทำ)
-        const provider = new firebase.auth.GoogleAuthProvider();
-        auth.signInWithRedirect(provider);
-            .then((result) => {
-                // ล็อคอินสำเร็จ, onAuthStateChanged จะจัดการ UI ต่อไป
-            })
-            .catch((error) => {
-                console.error("Login Pop-up failed:", error);
-                Swal.fire('ข้อผิดพลาดการล็อคอิน', 'กรุณาลองอีกครั้ง: ' + error.message, 'error');
-            });
-    } else {
-        // โค้ดสำหรับ Logout
-        auth.signOut().then(() => {
-            Swal.fire('สำเร็จ', 'คุณออกจากระบบแล้ว', 'success');
-        });
-    }
+    if (!auth.currentUser) {
+        // สร้าง Provider
+        const provider = new firebase.auth.GoogleAuthProvider();
+        
+        // 🎯 FIX 1: ลบ ; และ .then/.catch ออก
+        auth.signInWithRedirect(provider);
+        // เมื่อใช้ Redirect การทำงานจะสิ้นสุดที่บรรทัดนี้ และหน้าเว็บจะโหลดใหม่
+        
+    } else {
+        // โค้ดสำหรับ Logout
+        auth.signOut().then(() => {
+            Swal.fire('สำเร็จ', 'คุณออกจากระบบแล้ว', 'success');
+        });
+    }
 };
 // ฟังก์ชันบังคับตรวจสอบสิทธิ์
 function requireAuth() {
@@ -229,17 +227,11 @@ function requireAuth() {
 }
 
 auth.onAuthStateChanged(function(user) {
-    // 1. อัปเดต UI ตามสถานะล็อคอิน (รวมถึงเรียก initializeSiteSelection ภายในเมื่อล็อคอินสำเร็จ)
+ 
     updateUIForAuthState(user); 
 
     if (user) {
-        // 🛑 ลบ: eSelection();
-        // 💡 เหตุผล: Logic การโหลดไซต์ถูกย้ายไปอยู่ใน updateUIForAuthState(user) แล้ว
-        // การเรียกซ้ำอาจทำให้เกิดปัญหา Reference Error และ Flow Control
-
-    } else {
-        // 💡 โค้ดส่วนนี้ถูกย้ายไปอยู่ใน updateUIForAuthState(user) แล้ว
-        // จึงไม่จำเป็นต้องเขียนซ้ำใน onAuthStateChanged
+    } else {       
     }
 });
 
@@ -1512,6 +1504,7 @@ document.addEventListener("DOMContentLoaded", function() {
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
 };
+
 
 
 
