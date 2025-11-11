@@ -1072,7 +1072,7 @@ async function loadHistory() {
             </div>
 
             <div class="mt-4 flex justify-end space-x-2">
-                <button class="btn btn-ghost text-yellow-500 hover:bg-gray-700" onclick="editRecord('${r.ts}')"✏️ แก้ไข</button>
+                <button class="btn btn-ghost text-yellow-500 hover:bg-gray-700" onclick="editRecord('${r.ts}')">✏️ แก้ไข</button>
                 <button class="btn btn-danger text-white-500 hover:bg-gray-700" onclick="deleteRecord('${r.ts}')">🗑️ ลบ</button>
             </div>
         `;
@@ -1114,21 +1114,22 @@ window.updateDeviceSummary = async function() {
     }
     
     const siteData = sites[currentSiteKey];
-    const tbodyInitial = document.getElementById('summaryBody');
+    const tbody = document.getElementById('summaryBody'); // 💡 ย้ายมาประกาศตรงนี้
+    const paginationDiv = document.getElementById('pagination'); // 💡 ย้ายมาประกาศตรงนี้
 
     // 1. ตรวจสอบ Site Data ก่อน
     if (!siteData) {
         console.warn('❌ siteData ไม่พบสำหรับ currentSiteKey นี้');
-        if (tbodyInitial) { // ตรวจสอบก่อนใช้
-             tbodyInitial.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-500">ไม่พบ siteData สำหรับ site นี้</td></tr>';
+        if (tbody) { // ตรวจสอบก่อนใช้
+             tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-500">ไม่พบ siteData สำหรับ site นี้</td></tr>';
         }
         return;
     }
 
     // 2. ตรวจสอบ Device List ก่อน
     if (!siteData.devices || siteData.devices.length === 0) {
-        if (tbodyInitial) { // ตรวจสอบก่อนใช้
-            tbodyInitial.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-500">ไม่มีอุปกรณ์ใน site นี้</td></tr>';
+        if (tbody) { // ตรวจสอบก่อนใช้
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-red-500">ไม่มีอุปกรณ์ใน site นี้</td></tr>';
         }
         return;
     }
@@ -1140,84 +1141,98 @@ window.updateDeviceSummary = async function() {
     const from = document.getElementById('fromDate')?.value || '';
     const to = document.getElementById('toDate')?.value || '';
 
-    // 4. ดึงข้อมูลจาก Firestore
-    const docsSnap = await getSiteCollection(currentSiteKey).get({ source: 'server' });
-    const dataMap = {};
-    docsSnap.forEach(d => dataMap[d.id] = d.data());
+    let summary = []; // 💡 ย้ายมาประกาศตรงนี้
+    let pageData = []; // 💡 ประกาศ pageData
 
-    let summary = [];
+    // 💡 4. เพิ่ม TRY...CATCH BLOCK
+    try {
+        // 4. ดึงข้อมูลจาก Firestore
+        const docsSnap = await getSiteCollection(currentSiteKey).get({ source: 'server' });
+        const dataMap = {};
+        docsSnap.forEach(d => dataMap[d.id] = d.data());
 
-    // 5. ประมวลผลและ Filter ข้อมูล
-    for (const dev of siteData.devices) {
-        const docData = dataMap[dev] || {};
-        const records = docData.records || [];
+        // 5. ประมวลผลและ Filter ข้อมูล
+        for (const dev of siteData.devices) {
+            const docData = dataMap[dev] || {};
+            const records = docData.records || [];
 
-        let latestRecord = null;
-        if (records.length > 0) {
-            records.sort((a, b) => a.ts - b.ts);
-            latestRecord = records[records.length - 1];
+            let latestRecord = null;
+            if (records.length > 0) {
+                records.sort((a, b) => a.ts - b.ts);
+                latestRecord = records[records.length - 1];
+            }
+
+            let downCount = docData.downCount || 0;
+            const currentDeviceStatus = docData.currentStatus || 'ok';
+            const isCurrentlyDown = currentDeviceStatus === 'down';
+
+            // Calculate downtime
+            let latestBrokenDuration = '-';
+            let latestBrokenDays = 0;
+            if (isCurrentlyDown && latestRecord?.brokenDate) {
+                latestBrokenDays = calculateDaysDifference(latestRecord.brokenDate, null);
+                latestBrokenDuration = formatDuration(latestBrokenDays) + ' (ชำรุด)';
+            } else if (latestRecord?.brokenDate && latestRecord?.fixedDate) {
+                latestBrokenDays = calculateDaysDifference(latestRecord.brokenDate, latestRecord.fixedDate);
+                latestBrokenDuration = formatDuration(latestBrokenDays);
+            }
+
+            // Date filter
+            let latestDateStr = latestRecord?.brokenDate || null;
+            if (latestDateStr) {
+                const latestTs = new Date(latestDateStr).getTime();
+                if (from && latestTs < new Date(from).getTime()) continue;
+                if (to && latestTs >= new Date(to).getTime() + 86400000) continue;
+            }
+
+            // Status filter
+            if (filterStatus === 'currently-down' && !isCurrentlyDown) continue;
+            if (filterStatus === 'down' && downCount === 0) continue;
+            if (filterStatus === 'clean' && downCount > 0) continue;
+            if (search && !dev.toLowerCase().includes(search)) continue;
+
+
+            summary.push({
+                device: dev,
+                count: downCount,
+                brokenDate: latestRecord?.brokenDate || '-',
+                fixedDate: latestRecord?.fixedDate || '-',
+                status: isCurrentlyDown ? '❎ ชำรุด' : '✅ ใช้งานได้',
+                latestDescription: latestRecord?.description || '-',
+                latestBrokenDuration: latestBrokenDuration,
+                latestBrokenDays: latestBrokenDays
+            });
         }
 
-        let downCount = docData.downCount || 0;
-        const currentDeviceStatus = docData.currentStatus || 'ok';
-        const isCurrentlyDown = currentDeviceStatus === 'down';
-
-        // Calculate downtime
-        let latestBrokenDuration = '-';
-        let latestBrokenDays = 0;
-        if (isCurrentlyDown && latestRecord?.brokenDate) {
-            latestBrokenDays = calculateDaysDifference(latestRecord.brokenDate, null);
-            latestBrokenDuration = formatDuration(latestBrokenDays) + ' (ชำรุด)';
-        } else if (latestRecord?.brokenDate && latestRecord?.fixedDate) {
-            latestBrokenDays = calculateDaysDifference(latestRecord.brokenDate, latestRecord.fixedDate);
-            latestBrokenDuration = formatDuration(latestBrokenDays);
-        }
-
-        // Date filter
-        let latestDateStr = latestRecord?.brokenDate || null;
-        if (latestDateStr) {
-            const latestTs = new Date(latestDateStr).getTime();
-            if (from && latestTs < new Date(from).getTime()) continue;
-            if (to && latestTs >= new Date(to).getTime() + 86400000) continue;
-        }
-
-        // Status filter
-        if (filterStatus === 'currently-down' && !isCurrentlyDown) continue;
-        if (filterStatus === 'down' && downCount === 0) continue;
-        if (filterStatus === 'clean' && downCount > 0) continue;
-        if (search && !dev.toLowerCase().includes(search)) continue;
-
-
-        summary.push({
-            device: dev,
-            count: downCount,
-            brokenDate: latestRecord?.brokenDate || '-',
-            fixedDate: latestRecord?.fixedDate || '-',
-            status: isCurrentlyDown ? '❎ ชำรุด' : '✅ ใช้งานได้',
-            latestDescription: latestRecord?.description || '-',
-            latestBrokenDuration: latestBrokenDuration,
-            latestBrokenDays: latestBrokenDays
+        // 6. Sort
+        summary.sort((a, b) => {
+            const countSort = sortOrder === 'desc' ? b.count - a.count : a.count - b.count;
+            if (countSort !== 0) return countSort;
+            return b.latestBrokenDays - a.latestBrokenDays;
         });
+
+        // 7. Pagination Logic
+        const pageSize = 10;
+        const totalPages = Math.max(1, Math.ceil(summary.length / pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        pageData = summary.slice(startIndex, endIndex); // 💡 กำหนดค่าให้ pageData
+
+    } catch (error) {
+        console.error("Error fetching device summary (check Firestore rules?):", error);
+        if (tbody) {
+            // 💡 แสดงข้อความ Error ให้ผู้ใช้เห็น
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-red-500">🚫 ไม่สามารถโหลดข้อมูลได้ (กรุณาล็อคอิน หรือตรวจสอบ Firestore Rules)</td></tr>`;
+        }
+        updateChart([]); // 💡 เคลียร์กราฟ
+        if (paginationDiv) paginationDiv.innerHTML = ''; // 💡 เคลียร์ Pagination
+        return; // 💡 หยุดการทำงาน
     }
+    // 💡 END CATCH BLOCK
 
-    // 6. Sort
-    summary.sort((a, b) => {
-        const countSort = sortOrder === 'desc' ? b.count - a.count : a.count - b.count;
-        if (countSort !== 0) return countSort;
-        return b.latestBrokenDays - a.latestBrokenDays;
-    });
-
-    // 7. Pagination Logic
-    const pageSize = 10;
-    const totalPages = Math.max(1, Math.ceil(summary.length / pageSize));
-    if (currentPage > totalPages) currentPage = totalPages;
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const pageData = summary.slice(startIndex, endIndex);
-
-    // 8. Render tbody (จุดที่ต้องเพิ่มการป้องกัน Crash)
-    const tbody = document.getElementById('summaryBody');
-    if (tbody) { // 👈 การตรวจสอบความปลอดภัยที่สำคัญ
+    // 8. Render tbody
+    if (tbody) { 
         tbody.innerHTML = '';
         if (summary.length === 0) {
             tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-gray-400">ไม่พบข้อมูลอุปกรณ์ตามเงื่อนไขที่เลือก</td></tr>';
@@ -1242,9 +1257,9 @@ window.updateDeviceSummary = async function() {
         console.error("Error: Element 'summaryBody' not found. Table rendering failed.");
     }
 
-    // 9. Pagination controls (โค้ดเดิมที่คุณส่งมา ซึ่งครบถ้วนแล้ว)
-    const paginationDiv = document.getElementById('pagination');
-    if (paginationDiv) { // 👈 การตรวจสอบความปลอดภัย
+    // 9. Pagination controls
+    const totalPages = Math.max(1, Math.ceil(summary.length / 10)); // 💡 ต้องคำนวณ totalPages อีกครั้ง
+    if (paginationDiv) { 
         paginationDiv.innerHTML = `
             <div class="flex justify-center items-center gap-2 mt-2">
                 <button class="btn" onclick="changePage(-1)" ${currentPage===1?'disabled':''}>⬅️ ก่อนหน้า</button>
@@ -1259,7 +1274,6 @@ window.updateDeviceSummary = async function() {
     // 10. Update Chart
     updateChart(summary);
 };
-
 
 window.updateAllAffectedDevicesSummary = async function(deviceNames) {
     const batch = db.batch();
@@ -1551,6 +1565,7 @@ document.addEventListener("DOMContentLoaded", function() {
 window.onload = function() {
     try { imageMapResize(); } catch (e) {}
 };
+
 
 
 
