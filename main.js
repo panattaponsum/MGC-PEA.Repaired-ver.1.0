@@ -1376,8 +1376,9 @@ window.exportAllDataExcel = async function() {
             assetInfo.serial || '-',
             assetInfo.model || '-',
             assetInfo.manufacturer || '-',
-            assetInfo.warrantyStart || '-',
-            assetInfo.warrantyEnd || '-',
+            // 💥 FIX: แปลง - เป็น / 💥
+            (assetInfo.warrantyStart || '-').replace(/-/g, '/'), 
+            (assetInfo.warrantyEnd || '-').replace(/-/g, '/'),   
             warrantyStatusText
         ]);
 
@@ -1404,8 +1405,9 @@ window.exportAllDataExcel = async function() {
             // เพิ่ม 1 แถวต่อ 1 record ลงใน recordsData
             recordsData.push([
                 devName,
-                r.brokenDate || '-',
-                r.fixedDate || '-',
+                // 💥 FIX: แปลง - เป็น / 💥
+                (r.brokenDate || '-').replace(/-/g, '/'), 
+                (r.fixedDate || '-').replace(/-/g, '/'),  
                 duration, 
                 r.status === 'down' ? 'ชำรุด' : 'ใช้งานได้',
                 r.description || '-',
@@ -1592,4 +1594,5 @@ window.onload = function() {
     try { imageMapResize(); } catch (e) {}
     
 };
+
 
