@@ -194,7 +194,7 @@ function getWarrantyStatus(warrantyEnd) {
     } else if (diffDays <= 30) {
         return 'warn'; // ใกล้หมดประกัน (30 วัน)
     } else {
-        return 'ok'; // ยังรับประกัน
+        return 'ok'; // รับประกัน
     }
 }
 
@@ -517,7 +517,8 @@ function updateAssetDisplays(assetInfo) {
     }
 }
 
-// 💥 MODIFIED: loadHistory (สำคัญมาก) 💥
+// 💥💥💥 คัดลอกไปทับฟังก์ชัน loadHistory เดิม 💥💥💥
+
 async function loadHistory() {
     const container = document.getElementById('historySection');
     container.innerHTML = '';
@@ -560,15 +561,21 @@ async function loadHistory() {
         // ... (ส่วนการคำนวณ duration เหมือนเดิม) ...
         let duration = '-';
         if (r.brokenDate) {
+            
             if (r.fixedDate) {
+                // 🟢 รายการที่ "ซ่อมแล้ว"
                 const days = calculateDaysDifference(r.brokenDate, r.fixedDate);
                 duration = formatDuration(days);
-                // 💥💥💥 FIX 2: ลบ isCurrentBrokenFound = true; ออกจากที่นี่ 💥💥💥
-            } else if (!r.fixedDate && !isCurrentBrokenFound) { // 👈 ใช้ !r.fixedDate
+                // 💥💥💥 (แก้แล้ว) ลบ 'isCurrentBrokenFound = true;' ออกจากตรงนี้ 💥💥💥
+
+            } else if (!r.fixedDate && !isCurrentBrokenFound) { 
+                // 🟢 รายการที่ "ยังชำรุด" (และเป็นตัวแรกที่เจอ)
                 const days = calculateDaysDifference(r.brokenDate, null);
                 duration = formatDuration(days) + ' <span class="text-sm text-red-400 font-semibold">(ชำรุด)</span>';
-                isCurrentBrokenFound = true;
+                isCurrentBrokenFound = true; // 👈 ตั้งค่าว่าเจอแล้ว
+
             } else {
+                // 🟢 รายการที่ "ชำรุด" (แต่อันเก่ากว่า)
                  const days = calculateDaysDifference(r.brokenDate, null);
                  duration = formatDuration(days);
             }
@@ -770,9 +777,9 @@ function updateAssetWarrantyStatusField() {
     const field = document.getElementById('assetWarrantyStatus');
     
     switch (status) {
-        case 'ok': field.value = 'ยังรับประกัน'; break;
+        case 'ok': field.value = 'รับประกัน'; break;
         case 'warn': field.value = 'ใกล้หมดประกัน'; break;
-        case 'bad': field.value = 'หมดประกันแล้ว'; break;
+        case 'bad': field.value = 'หมดประกัน'; break;
         default: field.value = 'N/A (ข้อมูลไม่ครบ)';
     }
 }
@@ -1378,9 +1385,9 @@ window.exportAllDataExcel = async function() {
         const warrantyStatus = getWarrantyStatus(assetInfo.warrantyEnd);
         let warrantyStatusText = 'N/A (ไม่ระบุ)';
         switch(warrantyStatus) {
-            case 'ok': warrantyStatusText = 'ยังรับประกัน'; break;
+            case 'ok': warrantyStatusText = 'รับประกัน'; break;
             case 'warn': warrantyStatusText = 'ใกล้หมดประกัน'; break;
-            case 'bad': warrantyStatusText = 'หมดประกันแล้ว'; break;
+            case 'bad': warrantyStatusText = 'หมดประกัน'; break;
         }
 
         // เพิ่ม 1 แถวสำหรับอุปกรณ์นี้ลงใน assetData
@@ -1609,4 +1616,5 @@ window.onload = function() {
     try { imageMapResize(); } catch (e) {}
     
 };
+
 
