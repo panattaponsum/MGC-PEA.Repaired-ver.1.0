@@ -191,8 +191,8 @@ function getWarrantyStatus(warrantyEnd) {
 
     if (diffDays < 0) {
         return 'bad'; // หมดประกันแล้ว
-    } else if (diffDays <= 30) {
-        return 'warn'; // ใกล้หมดประกัน (30 วัน)
+    } else if (diffDays <= 180) {
+        return 'warn'; // ใกล้หมดประกัน (180 วัน)
     } else {
         return 'ok'; // ยังรับประกัน
     }
@@ -206,11 +206,11 @@ function getWarrantyStatus(warrantyEnd) {
 function getWarrantyStatusHTML(status) {
     switch (status) {
         case 'ok':
-            return '<span class="tag tag-warranty-ok">🛡️ ยังรับประกัน</span>';
+            return '<span class="tag tag-warranty-ok">🛡️ รับประกัน</span>';
         case 'warn':
             return '<span class="tag tag-warranty-warn">⚠️ ใกล้หมดประกัน</span>';
         case 'bad':
-            return '<span class="tag tag-warranty-bad">🚫 หมดประกันแล้ว</span>';
+            return '<span class="tag tag-warranty-bad">🚫 หมดประกัน</span>';
         default:
             return '<span>-</span>';
     }
@@ -1609,4 +1609,5 @@ window.onload = function() {
     try { imageMapResize(); } catch (e) {}
     
 };
+
 
