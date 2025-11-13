@@ -517,7 +517,6 @@ function updateAssetDisplays(assetInfo) {
     }
 }
 
-// 💥 (โค้ดนี้ถูกต้องแล้วสำหรับ Bug 2) 💥
 async function loadHistory() {
     const container = document.getElementById('historySection');
     container.innerHTML = '';
@@ -528,7 +527,10 @@ async function loadHistory() {
     let docData = null, records = [], assetInfo = null;
     
     try {
-        const snap = await docRef.get();
+        // 💥💥💥 FIX: เพิ่ม { source: 'server' } 💥💥💥
+        // บังคับให้ดึงข้อมูลใหม่ล่าสุดจากเซิร์ฟเวอร์เสมอ (ป้องกัน Cache)
+        const snap = await docRef.get({ source: 'server' }); 
+        
         if (snap.exists) {
             docData = snap.data();
             records = docData.records || [];
@@ -564,7 +566,6 @@ async function loadHistory() {
                 // 🟢 รายการที่ "ซ่อมแล้ว"
                 const days = calculateDaysDifference(r.brokenDate, r.fixedDate);
                 duration = formatDuration(days);
-                // 💥💥💥 (แก้แล้ว) ลบ 'isCurrentBrokenFound = true;' ออกจากตรงนี้ 💥💥💥
 
             } else if (!r.fixedDate && !isCurrentBrokenFound) { 
                 // 🟢 รายการที่ "ยังชำรุด" (และเป็นตัวแรกที่เจอ)
@@ -615,7 +616,6 @@ async function loadHistory() {
         container.appendChild(div);
     });
 }
-
 window.deleteRecord = async function(ts) {
     // 💥 MODIFIED: Check Auth (ปุ่มควรจะ disable อยู่แล้ว) 💥
     if (!currentUser) return;
@@ -1639,3 +1639,4 @@ window.onload = function() {
     try { imageMapResize(); } catch (e) {}
     
 };
+
