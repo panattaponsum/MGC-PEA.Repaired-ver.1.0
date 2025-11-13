@@ -247,14 +247,15 @@ function toggleWriteAccess(isLoggedIn) {
 
     // อัปเดตปุ่มในประวัติ (ถ้า Modal เปิดอยู่)
     // การเรียก loadHistory() ซ้ำจะจัดการเรื่องนี้ให้เอง
-    if (document.getElementById('formModal').style.display === 'block') {
+    if (document.getElementById('formModal').style.display === 'block' || document.getElementById('formModal').style.display === 'flex') { // 💥 FIX: รองรับ flex ด้วย
         loadHistory(); 
     }
     
     // อัปเดตช่องชื่อผู้ใช้
     const userNameInput = document.getElementById('userName');
     if (isLoggedIn && currentUser) {
-        userNameInput.value = currentUser.displayName || currentUser.email;
+        // 💥 FIX 1.1: ใช้ email แทน displayName
+        userNameInput.value = currentUser.email; 
         userNameInput.readOnly = true;
     } else {
         userNameInput.value = 'ผู้เยี่ยมชม (อ่านอย่างเดียว)';
@@ -287,7 +288,7 @@ window.openForm = async function(deviceName) {
     currentDevice = deviceName; editIndex = -1;
     document.getElementById('formTitle').textContent = `บันทึกข้อมูล: ${deviceName}`;
     document.getElementById('overlay').style.display = 'block';
-    document.getElementById('formModal').style.display = 'block';
+    document.getElementById('formModal').style.display = 'flex'; // 💥 FIX: ใช้ flex
     document.getElementById('editHint').classList.add('hidden');
     
     // รีเซ็ตหน้าจอข้อมูลทรัพย์สิน
@@ -300,7 +301,7 @@ window.openForm = async function(deviceName) {
 
 window.closeForm = function() {
     document.getElementById('overlay').style.display = 'none';
-    document.getElementById('formModal').style.display = 'none';
+    document.getElementById('formModal').style.display = 'none'; // 💥 FIX: ใช้ none
     // 💡 ปิดหน้า Asset ด้วย (ถ้าเผลอเปิดค้าง)
     closeAssetModal(false); 
 }
@@ -310,7 +311,8 @@ function clearForm() {
     if (!currentUser) {
         document.getElementById('userName').value = 'ผู้เยี่ยมชม (อ่านอย่างเดียว)';
     } else {
-        document.getElementById('userName').value = currentUser.displayName || currentUser.email;
+        // 💥 FIX 1.1 (ซ้ำ): ใช้ email
+        document.getElementById('userName').value = currentUser.email;
     }
     document.getElementById('status').value = 'ok';
     document.getElementById('brokenDate').value = '';
@@ -685,7 +687,7 @@ window.openAssetModal = async function() {
 window.closeAssetModal = function(showMainModal = true) {
     document.getElementById('assetModal').style.display = 'none';
     if (showMainModal && currentDevice) {
-        document.getElementById('formModal').style.display = 'flex';
+        document.getElementById('formModal').style.display = 'flex'; // 💥 FIX: ใช้ flex
     } else {
         // ถ้าไม่มี showMainModal หรือ currentDevice ให้ปิด overlay ไปเลย
         closeForm();
@@ -1141,8 +1143,8 @@ function setupRealtimeListener(siteKey) {
     });
 }
 
+// 💥💥💥 FUNCTION `importData` (แก้ไขทั้งหมด) 💥💥💥
 window.importData = function(event) {
-    // 💥 MODIFIED: Check Auth 💥
     if (!currentUser) {
         Swal.fire('ไม่ได้รับอนุญาต', 'กรุณาลงชื่อเข้าใช้ก่อนนำเข้าข้อมูล', 'warning');
         event.target.value = null; // เคลียร์ไฟล์ที่เลือก
@@ -1155,18 +1157,15 @@ window.importData = function(event) {
     const reader = new FileReader();
     reader.onload = function(e) {
         try {
-            // Assume XLSX library is loaded
             const data = new Uint8Array(e.target.result);
             const wb = XLSX.read(data, { type: 'array' });
 
-            // 💥 NEW: กำหนดชื่อชีตที่ต้องการอ่าน 💥
             const assetSheetName = "ข้อมูลทรัพย์สิน";
             const recordSheetName = "ประวัติการชำรุด";
 
             const wsAssets = wb.Sheets[assetSheetName];
             const wsRecords = wb.Sheets[recordSheetName];
 
-            // 💥 ตรวจสอบว่ามีชีตใดชีตหนึ่งหรือไม่ 💥
             if (!wsAssets && !wsRecords) {
                 Swal.fire('ผิดพลาด', 'ไม่พบชีต "ข้อมูลทรัพย์สิน" หรือ "ประวัติการชำรุด" ในไฟล์ Excel', 'error');
                 event.target.value = null;
@@ -1176,12 +1175,12 @@ window.importData = function(event) {
             const batch = db.batch();
             let totalAssets = 0;
             let totalRecords = 0;
-            const devicesToUpdateSummary = {}; // 💥 ใช้สำหรับ updateAllAffectedDevicesSummary
+            const devicesToUpdateSummary = {}; 
 
             // --- 1. 💥 ประมวลผลชีต "ข้อมูลทรัพย์สิน" 💥 ---
             if (wsAssets) {
                 const assetRawData = XLSX.utils.sheet_to_json(wsAssets, { header: 1 });
-                if (assetRawData.length >= 2) { // ตรวจสอบว่ามีข้อมูล (อย่างน้อย 1 แถว + header)
+                if (assetRawData.length >= 2) { 
                     const headers = assetRawData[0];
                     const headerMap = {
                         'ชื่ออุปกรณ์': headers.indexOf('ชื่ออุปกรณ์'),
@@ -1195,7 +1194,7 @@ window.importData = function(event) {
                     if (headerMap['ชื่ออุปกรณ์'] === -1) {
                         Swal.fire('ผิดพลาด (ทรัพย์สิน)', 'ชีต "ข้อมูลทรัพย์สิน" ต้องมีคอลัมน์ "ชื่ออุปกรณ์"', 'error');
                         event.target.value = null;
-                        return; // หยุดการนำเข้า
+                        return; 
                     }
 
                     for (let i = 1; i < assetRawData.length; i++) {
@@ -1216,20 +1215,21 @@ window.importData = function(event) {
                         };
 
                         const docRef = getSiteCollection(currentSiteKey).doc(deviceName);
-                        batch.set(docRef, { assetInfo: assetInfo }, { merge: true }); // 💥 บันทึก assetInfo
+                        batch.set(docRef, { assetInfo: assetInfo }, { merge: true }); 
                         totalAssets++;
                     }
                 }
             }
 
             // --- 2. 💥 ประมวลผลชีต "ประวัติการชำรุด" 💥 ---
-            const recordsToSave = {}; // ใช้สำหรับรวบรวม records
+            const recordsToSave = {}; 
             
             if (wsRecords) {
                 const recordRawData = XLSX.utils.sheet_to_json(wsRecords, { header: 1 });
-                if (recordRawData.length >= 2) { // ตรวจสอบว่ามีข้อมูล
+                if (recordRawData.length >= 2) { 
                     const headers = recordRawData[0];
                     const headerMap = {
+                        'Timestamp': headers.indexOf('Timestamp'), // 👈 💥 FIX 2.2: เพิ่ม Timestamp
                         'ชื่ออุปกรณ์': headers.indexOf('ชื่ออุปกรณ์'),
                         'วันที่ชำรุด': headers.indexOf('วันที่ชำรุด'),
                         'วันที่ซ่อมแซม': headers.indexOf('วันที่ซ่อมแซม'),
@@ -1242,7 +1242,7 @@ window.importData = function(event) {
                     if (requiredHeaders.some(h => headerMap[h] === -1)) {
                         Swal.fire('ผิดพลาด (ประวัติ)', 'ชีต "ประวัติการชำรุด" ต้องมีคอลัมน์: ชื่ออุปกรณ์, วันที่ชำรุด, สถานะ', 'error');
                         event.target.value = null;
-                        return; // หยุดการนำเข้า
+                        return; 
                     }
 
                     for (let i = 1; i < recordRawData.length; i++) {
@@ -1250,7 +1250,7 @@ window.importData = function(event) {
                         const deviceName = row[headerMap['ชื่ออุปกรณ์']];
                         if (!deviceName) continue;
                         
-                        devicesToUpdateSummary[deviceName] = true; // 💥 เพิ่มอุปกรณ์นี้ในรายการที่ต้องอัปเดตสรุป
+                        devicesToUpdateSummary[deviceName] = true; 
 
                         const statusValue = (row[headerMap['สถานะ']] || '').toString();
                         
@@ -1263,14 +1263,18 @@ window.importData = function(event) {
 
                         const fixedDateValue = importedFixedDate.length > 0 ? importedFixedDate : null;
 
+                        // 💥 FIX 2.2: ตรรกะ Timestamp และ Counted 💥
+                        const importedTs = row[headerMap['Timestamp']];
+                        const finalStatus = statusValue.includes('ชำรุด') ? 'down' : 'ok';
+                        
                         const record = {
-                            ts: Date.now() + i, 
+                            ts: importedTs ? parseInt(importedTs) : Date.now() + i, // 👈 ใช้ TS ที่นำเข้า (ถ้ามี)
                             brokenDate: importedBrokenDate,
                             fixedDate: fixedDateValue,
-                            status: statusValue.includes('ชำรุด') ? 'down' : 'ok',
+                            status: finalStatus, 
                             description: (row[headerMap['คำอธิบาย']] || '').toString() || 'นำเข้าจาก Excel',
-                            user: (row[headerMap['ผู้บันทึก']] || '').toString() || (currentUser.displayName || currentUser.email), 
-                            counted: !!importedBrokenDate, 
+                            user: (row[headerMap['ผู้บันทึก']] || '').toString() || currentUser.email, // 👈 💥 FIX 1.2: ใช้ email
+                            counted: (finalStatus === 'down'), // 👈 💥 FIX 2.2: ตรรกะ 'counted' ที่ถูกต้อง
                         };
                         
                         if (record.brokenDate && record.fixedDate === null) {
@@ -1290,19 +1294,17 @@ window.importData = function(event) {
                 batch.set(
                     deviceRef,
                     { records: firebase.firestore.FieldValue.arrayUnion(...newRecords) },
-                    { merge: true } // 💥 merge: true สำคัญมาก!
+                    { merge: true } 
                 );
             });
 
             // --- 4. 💥 Commit Batch 💥 ---
             if (totalAssets > 0 || totalRecords > 0) {
                 batch.commit().then(() => {
-                    // 💥 อัปเดตสรุปของอุปกรณ์ที่ได้รับผลกระทบ (จากชีตประวัติ)
                     if (totalRecords > 0) {
                         window.updateAllAffectedDevicesSummary(Object.keys(devicesToUpdateSummary)); 
                     }
                     
-                    // 💥 รีเฟรชตารางสรุปทั้งหมด (เพื่อแสดงข้อมูลประกันใหม่จากชีตทรัพย์สิน)
                     window.updateDeviceSummary(); 
 
                     Swal.fire({
@@ -1327,6 +1329,8 @@ window.importData = function(event) {
     event.target.value = null; // เคลียร์ไฟล์ที่เลือก
 };
 
+
+// 💥💥💥 FUNCTION `exportAllDataExcel` (แก้ไข) 💥💥💥
 window.exportAllDataExcel = async function() {
     const siteData = sites[currentSiteKey];
     if (!siteData || siteData.devices.length === 0) {
@@ -1340,6 +1344,7 @@ window.exportAllDataExcel = async function() {
 
     // --- 💥 Sheet 1: Device Records (ประวัติการชำรุด) ---
     const recordsHeader = [
+        'Timestamp', // 👈 💥 FIX 2.1: เพิ่ม Timestamp
         'ชื่ออุปกรณ์', 
         'วันที่ชำรุด', 
         'วันที่ซ่อมแซม', 
@@ -1412,6 +1417,7 @@ window.exportAllDataExcel = async function() {
             
             // เพิ่ม 1 แถวต่อ 1 record ลงใน recordsData
             recordsData.push([
+                r.ts || '-', // 👈 💥 FIX 2.1: เพิ่ม Timestamp
                 devName,
                 // 💥 FIX: แปลง - เป็น / 💥
                 (r.brokenDate || '-').replace(/-/g, '/'), 
@@ -1544,7 +1550,8 @@ document.addEventListener("DOMContentLoaded", function() {
             currentUser = user;
             document.getElementById('userInfo').classList.remove('hidden');
             document.getElementById('loginButton').classList.add('hidden');
-            document.getElementById('userNameDisplay').textContent = `สวัสดี, ${user.displayName || user.email}`;
+            // 💥 FIX 1.3: ใช้ email
+            document.getElementById('userNameDisplay').textContent = `สวัสดี, ${user.email}`; 
             toggleWriteAccess(true);
         } else {
             // ผู้ใช้ออกจากระบบ
@@ -1602,6 +1609,3 @@ window.onload = function() {
     try { imageMapResize(); } catch (e) {}
     
 };
-
-
-
