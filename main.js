@@ -538,10 +538,7 @@ async function loadHistory() {
     const docRef = getSiteCollection(currentSiteKey).doc(currentDevice);
     let docData = null, records = [], assetInfo = null;
     
-    try {
-        // 💥💥💥 FIX: เพิ่ม { source: 'server' } 💥💥💥
-        // บังคับให้ดึงข้อมูลใหม่ล่าสุดจากเซิร์ฟเวอร์เสมอ (ป้องกัน Cache)
-        const snap = await docRef.get({ source: 'server' }); 
+    try {   const snap = await docRef.get({ source: 'server' }); 
         
         if (snap.exists) {
             docData = snap.data();
@@ -554,10 +551,10 @@ async function loadHistory() {
         return;
     }
 
-    // 2. 💥 อัปเดตหน้าจอข้อมูลทรัพย์สิน (ที่อยู่เหนือประวัติ)
+    // 2. อัปเดตหน้าจอข้อมูลทรัพย์สิน (ที่อยู่เหนือประวัติ)
     updateAssetDisplays(assetInfo);
 
-    // 3. 💥 สร้างประวัติ (History)
+    // 3. สร้างประวัติ (History)
     records.sort((a, b) => b.ts - a.ts); // เรียงจากใหม่ไปเก่า
 
     if (records.length === 0) {
@@ -565,12 +562,17 @@ async function loadHistory() {
         return;
     }
     
-    // 4. 💥 ตรวจสอบสถานะล็อคอินสำหรับปุ่ม
+    // 4.  ตรวจสอบสถานะล็อคอินสำหรับปุ่ม
     const buttonsDisabled = currentUser ? '' : 'disabled title="กรุณาลงชื่อเข้าใช้"';
 
     let isCurrentBrokenFound = false; 
+	// ไม่ต้องมีตัวนับ recordCount เพราะใช้ totalRecords - index แล้ว
+    const totalRecords = records.length; // จำนวนรายการทั้งหมด
 
     records.forEach((r, index) => {
+        
+        // คำนวณลำดับที่ถูกต้อง (1 คือเก่าสุด, totalRecords คือใหม่สุด) 
+        const recordSequence = index + 1; // ใหม่สุดคือ index 0 = 1, index 1 = 2
         let duration = '-';
         if (r.brokenDate) {
             
@@ -602,6 +604,7 @@ async function loadHistory() {
             <div class="flex justify-between items-start border-b border-gray-700 pb-2 mb-2">
                 <div class="text-lg font-bold text-white">
                     <span class="tag ${statusClass}">${statusText}</span>
+					<span class="ml-2 text-base text-gray-300">| บันทึกครั้งที่ ${recordSequence}</span>
                 </div>
                 <div class="text-sm text-gray-400">
                     บันทึกโดย: <span class="font-semibold text-white">${escapeHtml(r.user || 'ไม่ระบุ')}</span>
@@ -1659,6 +1662,7 @@ window.onload = function() {
     try { imageMapResize(); } catch (e) {}
     
 };
+
 
 
 
