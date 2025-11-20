@@ -572,7 +572,7 @@ const totalRecords = records.length; // จำนวนรายการทั�
 records.forEach((r, index) => {
 
 // คำนวณลำดับที่ถูกต้อง (1 คือเก่าสุด, totalRecords คือใหม่สุด) 
-        const recordSequence = index + 1; // ใหม่สุดคือ index 0 = 1, index 1 = 2
+     
         const recordSequence = totalRecords - index;
 let duration = '-';
 if (r.brokenDate) {
@@ -605,7 +605,6 @@ div.innerHTML = `
            <div class="flex justify-between items-start border-b border-gray-700 pb-2 mb-2">
                <div class="text-lg font-bold text-white">
                    <span class="tag ${statusClass}">${statusText}</span>
-					<span class="ml-2 text-base text-gray-300">| บันทึกครั้งที่ ${recordSequence}</span>
 					<span class="ml-2 text-base text-gray-300">| ครั้งที่ ${recordSequence}</span>
                </div>
                <div class="text-sm text-gray-400">
@@ -1384,8 +1383,6 @@ reader.readAsArrayBuffer(file);
 event.target.value = null; // เคลียร์ไฟล์ที่เลือก
 };
 
-
-// 💥💥💥 FUNCTION `exportAllDataExcel` (แก้ไข) 💥💥💥
 window.exportAllDataExcel = async function() {
 const siteData = sites[currentSiteKey];
 if (!siteData || siteData.devices.length === 0) {
@@ -1399,8 +1396,9 @@ docsSnap.forEach(d => dataMap[d.id] = d.data());
 
 // --- 💥 Sheet 1: Device Records (ประวัติการชำรุด) ---
 const recordsHeader = [
-'Timestamp', // 👈 💥 FIX 2.1: เพิ่ม Timestamp
+'Timestamp', 
 'ชื่ออุปกรณ์', 
+'การชำรุด (ครั้งที่)', 
 'วันที่ชำรุด', 
 'วันที่ซ่อมแซม', 
 'ระยะเวลาชำรุด', 
@@ -1408,7 +1406,7 @@ const recordsHeader = [
 'คำอธิบาย', 
 'ผู้บันทึก' 
 ];
-const recordsData = [recordsHeader]; // เริ่มด้วย Header
+const recordsData = [recordsHeader]; 
 
 // --- 💥 Sheet 2: Asset Information (ข้อมูลทรัพย์สิน) ---
 const assetHeader = [
@@ -1426,7 +1424,6 @@ const assetData = [assetHeader]; // เริ่มด้วย Header
 for (const devName of siteData.devices) {
 const docData = dataMap[devName];
 
-// --- 1. เตรียมข้อมูลสำหรับ Sheet 2 (Assets) ---
 const assetInfo = docData?.assetInfo || {}; // ดึงข้อมูลทรัพย์สิน
 
 // คำนวณสถานะประกันเพื่อแสดงผล
@@ -1456,34 +1453,48 @@ continue; // ข้ามไปอุปกรณ์ถัดไปถ้าไ�
 }
 
 const records = docData.records || [];
+        
+        // 💥 NEW: เรียงลำดับ records จากเก่าไปใหม่ (เพื่อคำนวณลำดับชำรุด)
+        records.sort((a, b) => a.ts - b.ts);
+        
+        let downCount = 0; // ตัวนับลำดับการชำรุด
 
-// วนลูปทุกประวัติของอุปกรณ์นี้
-records.forEach(r => {
-let duration = '-';
-if (r.brokenDate) {
-if (r.fixedDate) {
-const days = calculateDaysDifference(r.brokenDate, r.fixedDate);
-duration = formatDuration(days);
-} else if (r.status === 'down') {
-const days = calculateDaysDifference(r.brokenDate, null); 
-duration = formatDuration(days) + ' (ชำรุด)';
-}
-}
+        // วนลูปทุกประวัติของอุปกรณ์นี้
+        records.forEach(r => {
+            let duration = '-';
+            let sequenceNumber = '-'; // ค่าเริ่มต้น
 
-// เพิ่ม 1 แถวต่อ 1 record ลงใน recordsData
-recordsData.push([
-r.ts || '-', // 👈 💥 FIX 2.1: เพิ่ม Timestamp
-devName,
-// 💥 FIX: แปลง - เป็น / 💥
-(r.brokenDate || '-').replace(/-/g, '/'), 
-(r.fixedDate || '-').replace(/-/g, '/'),  
-duration, 
-r.status === 'down' ? 'ชำรุด' : 'ใช้งานได้',
-r.description || '-',
-r.user || '-', 
-]);
-});
-}
+            // 💥 NEW: ตรวจสอบและนับเฉพาะรายการที่ถูก 'counted' (ถือเป็นการชำรุดที่ถูกนับ)
+            if (r.counted) {
+                 downCount++; 
+                 sequenceNumber = downCount;
+            }
+
+            if (r.brokenDate) {
+                if (r.fixedDate) {
+                    const days = calculateDaysDifference(r.brokenDate, r.fixedDate);
+                    duration = formatDuration(days);
+                } else if (r.status === 'down') {
+                    const days = calculateDaysDifference(r.brokenDate, null); 
+                    duration = formatDuration(days) + ' (ชำรุด)';
+                }
+            }
+            
+            // เพิ่ม 1 แถวต่อ 1 record ลงใน recordsData
+            recordsData.push([
+                r.ts || '-', 
+                devName,
+                sequenceNumber, 
+                // 💥 FIX: แปลง - เป็น / 💥
+                (r.brokenDate || '-').replace(/-/g, '/'), 
+                (r.fixedDate || '-').replace(/-/g, '/'),  
+                duration, 
+                r.status === 'down' ? 'ชำรุด' : 'ใช้งานได้',
+                r.description || '-',
+                r.user || '-', 
+            ]);
+        });
+    }
 
 // --- ตรวจสอบว่ามีข้อมูลให้ส่งออกหรือไม่ ---
 if (recordsData.length <= 1 && assetData.length <= 1) {
@@ -1664,6 +1675,7 @@ window.onload = function() {
 try { imageMapResize(); } catch (e) {}
 
 };
+
 
 
 
