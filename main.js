@@ -1383,7 +1383,6 @@ window.importData = function(event) {
 };
 
 
-// 💥💥💥 FUNCTION `exportAllDataExcel` (แก้ไข) 💥💥💥
 window.exportAllDataExcel = async function() {
     const siteData = sites[currentSiteKey];
     if (!siteData || siteData.devices.length === 0) {
@@ -1397,8 +1396,9 @@ window.exportAllDataExcel = async function() {
 
     // --- 💥 Sheet 1: Device Records (ประวัติการชำรุด) ---
     const recordsHeader = [
-        'Timestamp', // 👈 💥 FIX 2.1: เพิ่ม Timestamp
+        'Timestamp', 
         'ชื่ออุปกรณ์', 
+        'ลำดับการชำรุด , 
         'วันที่ชำรุด', 
         'วันที่ซ่อมแซม', 
         'ระยะเวลาชำรุด', 
@@ -1455,9 +1455,22 @@ window.exportAllDataExcel = async function() {
         
         const records = docData.records || [];
         
+        // 💥 NEW: เรียงลำดับ records จากเก่าไปใหม่ (เพื่อคำนวณลำดับชำรุด)
+        records.sort((a, b) => a.ts - b.ts);
+        
+        let downCount = 0; // ตัวนับลำดับการชำรุด (เริ่มใหม่สำหรับแต่ละอุปกรณ์)
+
         // วนลูปทุกประวัติของอุปกรณ์นี้
         records.forEach(r => {
             let duration = '-';
+            let sequenceNumber = '-'; // ค่าเริ่มต้น
+
+            // 💥 NEW: ตรวจสอบและนับเฉพาะรายการที่ถูก 'counted' (ถือเป็นการชำรุดที่ถูกนับ)
+            if (r.counted) {
+                 downCount++; 
+                 sequenceNumber = downCount; // ครั้งที่ 1, 2, 3...
+            }
+            
             if (r.brokenDate) {
                 if (r.fixedDate) {
                     const days = calculateDaysDifference(r.brokenDate, r.fixedDate);
@@ -1470,8 +1483,9 @@ window.exportAllDataExcel = async function() {
             
             // เพิ่ม 1 แถวต่อ 1 record ลงใน recordsData
             recordsData.push([
-                r.ts || '-', // 👈 💥 FIX 2.1: เพิ่ม Timestamp
+                r.ts || '-', 
                 devName,
+                sequenceNumber, 
                 // 💥 FIX: แปลง - เป็น / 💥
                 (r.brokenDate || '-').replace(/-/g, '/'), 
                 (r.fixedDate || '-').replace(/-/g, '/'),  
@@ -1508,9 +1522,8 @@ window.exportAllDataExcel = async function() {
     const fileName = `Device_Export_${siteData.name.replace(/\s/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     XLSX.writeFile(wb, fileName);
 
-    Swal.fire('ส่งออกสำเร็จ', `ไฟล์ ${fileName} ถูกบันทึกแล้ว (มี 2 ชีต)`, "success");
+    Swal.fire('ส่งออกสำเร็จ', `ไฟล์ ${fileName} ถูกบันทึกแล้ว `, "success");
 };
-
 function resetFilters() {
     document.getElementById('searchInput').value = '';
     document.getElementById('sortOrder').value = 'desc';
@@ -1662,6 +1675,7 @@ window.onload = function() {
     try { imageMapResize(); } catch (e) {}
     
 };
+
 
 
 
