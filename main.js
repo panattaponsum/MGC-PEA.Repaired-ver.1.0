@@ -1806,37 +1806,38 @@ window.printReport = async function() {
     `);
     printWindow.document.close();
 };
-// 💥💥💥 LINE NOTIFY FUNCTION 💥💥💥
-async function sendLineNotify(deviceName, description, user) {
-    // 1. ใส่ URL ที่ได้จาก Google Apps Script ตรงนี้
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbzgCePpuzZkhyklQwyCmdUD-d0tFGiT4AA34MC5gFte9Yt4NASAD692VBOPHIymAFInsg/exec"; 
+async function sendDiscordNotify(deviceName, description, user) {
+    // URL เดิมจาก Google Apps Script ของคุณ
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwMMbSEA1SI3m4WRe1bkwh7gxFbIHdqfdnk2ENVUEohVKyl1eiNXZwCWWs6tBw48f9G9A/exec"; 
 
     const message = `
-🚨 แจ้งเตือนอุปกรณ์ชำรุด
-📍 สถานที่: ${sites[currentSiteKey].name}
-ex อุปกรณ์: ${deviceName}
-📝 อาการ: ${description || '-'}
-👤 ผู้แจ้ง: ${user}
-🕒 เวลา: ${new Date().toLocaleString('th-TH')}
+🚨 **แจ้งเตือนอุปกรณ์ชำรุด**
+📍 **สถานที่:** ${sites[currentSiteKey].name}
+🛠️ **อุปกรณ์:** ${deviceName}
+📝 **อาการ:** ${description || '-'}
+👤 **ผู้แจ้ง:** ${user}
+🕒 **เวลา:** ${new Date().toLocaleString('th-TH')}
+------------------------------------------
     `;
 
     try {
-        // ส่งข้อมูลไปที่ Google Script (เพื่อเลี่ยง CORS)
+        // 💥 MODIFIED: เพิ่ม &site=${currentSiteKey} ต่อท้าย body เพื่อบอกว่าส่งมาจากที่ไหน
         await fetch(GAS_URL, {
             method: 'POST',
-            mode: 'no-cors', // สำคัญ: เพื่อไม่ให้ Browser บล็อก
+            mode: 'no-cors',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: `message=${encodeURIComponent(message)}`
+            body: `message=${encodeURIComponent(message)}&site=${encodeURIComponent(currentSiteKey)}`
         });
-        console.log("LINE Notification sent!");
+        console.log(`Discord Notification sent to ${currentSiteKey}!`);
     } catch (e) {
-        console.error("Failed to send LINE:", e);
+        console.error("Failed to send Discord:", e);
     }
 }
 window.onload = function() {
 try { imageMapResize(); } catch (e) {}
 	
 };
+
 
 
 
